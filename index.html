@@ -134,9 +134,11 @@
   #offline .panel{
     background:#10131c;border:1px solid #232a3a;border-radius:8px;
     padding:22px 30px;text-align:center;min-width:280px;
+    pointer-events:auto;       /* allow the start-button inside to be clickable */
   }
   #offline h2{margin:0 0 8px;font-size:16px;color:#f0f3fa;font-weight:600;}
-  #offline p{margin:0;font-size:13px;color:#9aa3b8;line-height:1.5;}
+  #offline p{margin:0 0 14px;font-size:13px;color:#9aa3b8;line-height:1.5;}
+  #offline .panel button{padding:10px 22px;font-size:14px;}
   #offline .spinner{
     width:14px;height:14px;border:2px solid #2c3548;border-top-color:#5a7ed0;
     border-radius:50%;animation:spin 1s linear infinite;display:inline-block;
@@ -370,8 +372,11 @@
     <canvas id="cv" width="800" height="600" tabindex="0"></canvas>
     <div id="offline" class="hidden">
       <div class="panel">
-        <h2><span class="spinner"></span>Warte auf metin2client.exe …</h2>
+        <h2><span class="spinner"></span>Ich warte darauf dass Cryptin startet …</h2>
         <p>Streamer prüft alle 5 Sekunden. Sobald das Spiel läuft, geht es automatisch weiter.</p>
+        <button class="btn primary feature-btn" type="button"
+                data-feature="client" data-target="start"
+                title="metin2client.exe starten">▶ Client starten</button>
       </div>
     </div>
     <div id="fg-popup" class="hidden" role="dialog" aria-modal="true" aria-labelledby="fg-title">

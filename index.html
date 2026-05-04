@@ -833,8 +833,8 @@
   // Discrete zoom steps so users can't keep clicking forever and end up at
   // 0.001x or 50x. Default = 1.0 (object-fit: contain fits stage exactly).
   const ZOOM_STEPS = [0.5, 0.65, 0.8, 1.0];
-  const ZOOM_DEFAULT = 3;        // index of 1.0 (= max; clicking + at default does nothing)
-  const ZOOM_LS_KEY  = "cryptin_zoom_v1";
+  const ZOOM_DEFAULT = 2;        // index of 0.8 (default zoom = 80 %)
+  const ZOOM_LS_KEY  = "cryptin_zoom_v2";  // bumped so old persisted index is ignored
   let zoomIdx = (() => {
     try {
       const v = parseInt(localStorage.getItem(ZOOM_LS_KEY) || "", 10);

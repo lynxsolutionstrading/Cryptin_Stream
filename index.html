@@ -299,12 +299,15 @@
 
         <h3>Client</h3>
         <div class="row">
-          <button class="btn warn feature-btn" type="button"
-                  data-feature="client" data-target="restart"
-                  title="Beendet metin2client.exe und startet ihn neu (restart.bat)">🔄 Client neustarten</button>
           <button class="btn primary feature-btn" type="button"
                   data-feature="client" data-target="start"
                   title="metin2client.exe starten (wenn nicht läuft)">▶ Client starten</button>
+          <button class="btn warn feature-btn" type="button"
+                  data-feature="client" data-target="close"
+                  title="Beendet alle laufenden metin2client.exe Instanzen">⏹ Client schließen</button>
+          <button class="btn warn feature-btn" type="button"
+                  data-feature="client" data-target="restart"
+                  title="Beendet metin2client.exe und startet ihn neu (restart.bat)">🔄 Client neustarten</button>
         </div>
 
         <p style="font-size:11px;color:#6f7a93;margin:10px 0 0;line-height:1.5;">
@@ -581,6 +584,10 @@
               // Friendly "already open" notice instead of generic success
               featureStatus.style.color = "#e0b454";
               featureStatus.textContent = "⚠ Der Client ist bereits offen!";
+            } else if (m.ok && m.feature === "client" && m.target === "close"
+                     && /not_running/.test(m.command || "")) {
+              featureStatus.style.color = "#e0b454";
+              featureStatus.textContent = "⚠ Der Client läuft nicht.";
             } else if (m.ok) {
               featureStatus.style.color = "#7cd0a8";
               featureStatus.textContent = `✓ ${tag}: ${m.command || "executed"}`;

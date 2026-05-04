@@ -21,7 +21,11 @@
     border-radius:4px;cursor:pointer;font-size:12px;
   }
   #bar button:hover{background:#222a3c;}
+  #bar button.primary{background:#2a4a8a;border-color:#3a5a9a;color:#fff;}
+  #bar button.primary:hover{background:#345aa0;}
+  #bar button.warn{background:#5a2020;border-color:#7a3030;color:#ffd0d0;}
   #bar .spacer{flex:1;}
+  #bar .stale{color:#e88;}
 
   #stage{flex:1;display:flex;justify-content:center;align-items:center;overflow:hidden;background:#000;position:relative;}
   canvas{background:#000;max-width:100%;max-height:100%;cursor:crosshair;outline:none;image-rendering:pixelated;}
@@ -81,8 +85,10 @@
     <span class="dot"></span>
     <span id="msg">setup…</span>
     <span id="fps"></span>
+    <span id="stale-indicator"></span>
     <span class="spacer"></span>
     <span style="opacity:.6">Click canvas → keyboard. </span>
+    <button id="btn-restart" class="primary" type="button" title="Verbindung komplett neu aufbauen (Strg+R im Canvas funktioniert auch)">Restart Stream</button>
     <button id="btn-fs" type="button">Fullscreen</button>
     <button id="btn-reconfig" type="button">Settings</button>
     <button id="btn-mute-input" type="button" title="Block all mouse/keyboard forwarding">View-only: OFF</button>
@@ -125,13 +131,17 @@
   const setup = $("setup"), wsInput = $("ws-url"), tokenInput = $("token"),
         rememberInput = $("remember"), errEl = $("setup-err");
   const btnConnect = $("btn-connect"), btnFs = $("btn-fs"),
-        btnReconfig = $("btn-reconfig"), btnMute = $("btn-mute-input");
-  const offline = $("offline");
+        btnReconfig = $("btn-reconfig"), btnMute = $("btn-mute-input"),
+        btnRestart = $("btn-restart");
+  const offline = $("offline"), staleEl = $("stale-indicator");
 
   const LS_KEY = "cryptin_stream_cfg_v1";
   let ws = null, viewOnly = false;
   let frames = 0, lastFpsTs = performance.now(), bytesIn = 0;
   let urlCur = null;
+  let lastFrameTs = 0;          // wall-clock of last received binary frame
+  let staleTimer = null;        // setInterval handle for stale detection
+  let autoRestartArmed = false; // flips true once we've seen >=1 frame, so we know "stuck" is real
 
   // ---- config: URL params override localStorage ----
   function loadCfg() {
@@ -206,6 +216,8 @@
       }
       // binary -> JPEG frame
       offline.classList.add("hidden");  // any frame implies game is up
+      lastFrameTs = performance.now();
+      autoRestartArmed = true;
       bytesIn += ev.data.byteLength;
       const blob = new Blob([ev.data], { type: "image/jpeg" });
       const url = URL.createObjectURL(blob);
@@ -230,6 +242,56 @@
   }
 
   function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+
+  // Hard reset: tear down WS, clear state, reconnect with current saved cfg.
+  function restartStream(reason) {
+    if (reason) console.info("[restart]", reason);
+    // tear down current socket; remove handlers so close-handler doesn't auto-reconnect
+    try {
+      if (ws) {
+        ws.onopen = ws.onclose = ws.onerror = ws.onmessage = null;
+        ws.close();
+      }
+    } catch {}
+    ws = null;
+    // reset stats
+    frames = 0; bytesIn = 0; lastFpsTs = performance.now();
+    lastFrameTs = 0; autoRestartArmed = false;
+    fpsEl.textContent = "";
+    staleEl.textContent = "";
+    staleEl.classList.remove("stale");
+    // visual: clear canvas to indicate fresh start
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    setStatus("restarting…", "warn");
+
+    const cfg = loadCfg();
+    if (!cfg.ws) {
+      setup.classList.remove("hidden");
+      return;
+    }
+    connect(cfg);
+    cv.focus();
+  }
+
+  // Stale-frame indicator — runs once a second.
+  // Shows "stale 2.3s" in red when no frame has arrived for >2s, while the
+  // status bar still says "connected". Helps you notice a frozen stream.
+  setInterval(() => {
+    if (!ws || ws.readyState !== 1 || !autoRestartArmed) {
+      staleEl.textContent = "";
+      staleEl.classList.remove("stale");
+      return;
+    }
+    const age = (performance.now() - lastFrameTs) / 1000;
+    if (age > 2) {
+      staleEl.textContent = `· stale ${age.toFixed(1)}s`;
+      staleEl.classList.add("stale");
+    } else {
+      staleEl.textContent = "";
+      staleEl.classList.remove("stale");
+    }
+  }, 500);
 
   // ---- input forwarding ----
   function pos(ev) {
@@ -271,6 +333,12 @@
   });
 
   cv.addEventListener("keydown", e => {
+    // Local hotkey: Ctrl+R restarts the stream WITHOUT reloading the page.
+    if (e.ctrlKey && (e.key === "r" || e.key === "R")) {
+      e.preventDefault();
+      restartStream("hotkey Ctrl+R");
+      return;
+    }
     if (viewOnly) return;
     send({type:"key", down:true, key:e.key, code:e.code});
     if (e.key !== "F5" && e.key !== "F12") e.preventDefault();
@@ -291,6 +359,8 @@
     connect(cfg);
     cv.focus();
   });
+
+  btnRestart.addEventListener("click", () => restartStream("button"));
 
   btnFs.addEventListener("click", () => {
     const el = document.documentElement;

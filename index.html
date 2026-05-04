@@ -85,6 +85,22 @@
     transition:opacity .25s ease;
   }
   #offline.hidden{opacity:0;pointer-events:none;}
+
+  /* ---------- foreground-lost popup (game running but not focused) ---------- */
+  #fg-popup{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(0,0,0,0.85);z-index:8;
+  }
+  #fg-popup.hidden{display:none;}
+  #fg-popup .panel{
+    background:#10131c;border:1px solid #232a3a;border-radius:8px;
+    padding:24px 30px;text-align:center;max-width:min(540px,90vw);
+    box-shadow:0 12px 40px rgba(0,0,0,0.6);
+  }
+  #fg-popup h2{margin:0 0 10px;font-size:17px;color:#f0f3fa;font-weight:600;line-height:1.3;}
+  #fg-popup p{margin:0 0 18px;font-size:13px;color:#9aa3b8;line-height:1.5;}
+  #fg-popup button{padding:11px 24px;font-size:14px;}
+  #fg-popup .msg{margin-top:12px;font-size:11px;color:#6f7a93;min-height:14px;}
   #offline .panel{
     background:#10131c;border:1px solid #232a3a;border-radius:8px;
     padding:22px 30px;text-align:center;min-width:280px;
@@ -204,6 +220,35 @@
     <span id="stale-indicator"></span>
     <span class="spacer"></span>
     <span class="hint">Click canvas → keyboard</span>
+
+    <!-- Game Features dropdown — interactive in-game commands -->
+    <div class="dropdown">
+      <button id="btn-features-toggle" class="btn" type="button"
+              aria-expanded="false" aria-controls="features-panel"
+              aria-label="Game Features">
+        <span class="settings-icon">🎮</span>
+        <span class="settings-label">Game Features</span>
+        <span class="settings-caret" aria-hidden="true">▾</span>
+      </button>
+      <div id="features-panel" class="dropdown-panel" role="menu">
+        <h3>Teleportation</h3>
+        <div class="row">
+          <button class="btn primary feature-btn" type="button"
+                  data-feature="teleport" data-target="bulls"
+                  title="Teleport zu Map1 Rot (a1)">📈 Bulls <span style="opacity:.65">— Map1 Rot (a1)</span></button>
+          <button class="btn primary feature-btn" type="button"
+                  data-feature="teleport" data-target="bears"
+                  title="Teleport zu Map1 Blau (c1)">📉 Bears <span style="opacity:.65">— Map1 Blau (c1)</span></button>
+        </div>
+        <p style="font-size:11px;color:#6f7a93;margin:10px 0 0;line-height:1.5;">
+          Sendet einen GM-Warp-Befehl über die Chat-Eingabe. Ergebnis erscheint
+          unten als kurze Bestätigung.
+        </p>
+        <div id="feature-status" class="err" style="color:#9aa3b8;"></div>
+      </div>
+    </div>
+
+    <!-- Stream Settings dropdown -->
     <div class="dropdown">
       <button id="btn-settings-toggle" class="btn primary" type="button"
               aria-expanded="false" aria-controls="settings-panel"
@@ -257,6 +302,14 @@
         <p>Streamer prüft alle 5 Sekunden. Sobald das Spiel läuft, geht es automatisch weiter.</p>
       </div>
     </div>
+    <div id="fg-popup" class="hidden" role="dialog" aria-modal="true" aria-labelledby="fg-title">
+      <div class="panel">
+        <h2 id="fg-title">Cryptin befindet sich an deinem Computer nicht mehr im Vordergrund!</h2>
+        <p>Soll ich das Spiel wieder in den Vordergrund bringen?</p>
+        <button id="btn-fg-yes" class="btn primary" type="button">Ja bitte</button>
+        <div id="fg-msg" class="msg"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -297,8 +350,8 @@
         btnConnect = $("btn-connect");
 
   // Stream Settings dropdown
-  const dropdownBtn  = $("btn-settings-toggle"),
-        dropdownPanel = $("settings-panel"),
+  const settingsBtn   = $("btn-settings-toggle"),
+        settingsPanel = $("settings-panel"),
         dropdownBackdrop = $("dropdown-backdrop"),
         cfgWsInput    = $("cfg-ws"),
         cfgTokenInput = $("cfg-token"),
@@ -308,6 +361,16 @@
         btnRestart    = $("btn-restart"),
         btnFs         = $("btn-fs"),
         btnMute       = $("btn-mute-input");
+
+  // Game Features dropdown
+  const featuresBtn   = $("btn-features-toggle"),
+        featuresPanel = $("features-panel"),
+        featureStatus = $("feature-status");
+
+  // Foreground-lost popup
+  const fgPopup = $("fg-popup"),
+        fgMsg   = $("fg-msg"),
+        btnFgYes = $("btn-fg-yes");
 
   const isMobileMQ = window.matchMedia("(max-width: 640px)");
 
@@ -325,6 +388,17 @@
   let lastFrameTs = 0;
   let autoRestartArmed = false;
   let curStatusText = "—";
+  // Combined state: game = running/stopped, fg = game window in foreground?
+  let curGame = "stopped";
+  let curFg   = true;
+
+  function syncOverlays() {
+    const gameRunning = curGame === "running";
+    offline.classList.toggle("hidden", gameRunning);
+    // Foreground popup only when game is up but its window isn't focused.
+    fgPopup.classList.toggle("hidden", !(gameRunning && !curFg));
+    if (gameRunning && curFg) fgMsg.textContent = "";
+  }
 
   // ---------------------------------------------------------------- config
   function loadCfg() {
@@ -399,11 +473,33 @@
         try {
           const m = JSON.parse(ev.data);
           if (m.type === "status") {
-            const running = m.game === "running";
-            offline.classList.toggle("hidden", running);
+            curGame = m.game;
+            const running = curGame === "running";
             setStatus(running ? "Connected - Cryptin LIVE (Control Subscription)"
                               : "Cryptin LIVE - Waiting for client",
                       running ? "ok" : "warn");
+            syncOverlays();
+          } else if (m.type === "foreground") {
+            curFg = !!m.active;
+            syncOverlays();
+          } else if (m.type === "focus_result") {
+            if (m.ok) {
+              fgMsg.style.color = "#7cd0a8";
+              fgMsg.textContent = "✓ zurückgeholt";
+            } else {
+              fgMsg.style.color = "#e88";
+              fgMsg.textContent = "✗ konnte das Fenster nicht aktivieren — bitte manuell anklicken";
+              btnFgYes.disabled = false;
+            }
+          } else if (m.type === "feature_result") {
+            const tag = `${m.feature} → ${m.target}`;
+            if (m.ok) {
+              featureStatus.style.color = "#7cd0a8";
+              featureStatus.textContent = `✓ ${tag}: ${m.command || "executed"}`;
+            } else {
+              featureStatus.style.color = "#e88";
+              featureStatus.textContent = `✗ ${tag}: ${m.error || "failed"}`;
+            }
           }
         } catch {}
         return;
@@ -451,9 +547,12 @@
     frames = 0; bytesIn = 0; lastFpsTs = performance.now();
     lastFrameTs = 0; autoRestartArmed = false;
     lastFps = 0; lastKbs = 0; lastFrameSize = 0;
+    curGame = "stopped"; curFg = true;
     fpsEl.textContent = "";
     staleEl.textContent = "";
     staleEl.classList.remove("stale");
+    fgPopup.classList.add("hidden");
+    fgMsg.textContent = "";
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, cv.width, cv.height);
     setStatus("restarting…", "warn");
@@ -484,8 +583,8 @@
       }
     }
 
-    // settings panel stats — only update when panel is visible (cheap but pointless to recompute hidden)
-    if (dropdownPanel.classList.contains("open")) {
+    // settings panel stats — only update when the settings panel is visible
+    if (settingsPanel.classList.contains("open")) {
       statStatus.textContent = curStatusText;
       statRes.textContent = (cv.width && cv.height) ? `${cv.width} × ${cv.height}` : "—";
       statPerf.textContent = lastFps
@@ -552,44 +651,73 @@
     if (e.key !== "F5" && e.key !== "F12") e.preventDefault();
   });
 
-  // ---------------------------------------------------------------- dropdown UX
-  function positionPanelForMobile() {
-    // On phones we use position:fixed and dynamically anchor the panel just below
-    // the bar — that way it adapts when the bar wraps to multiple lines.
-    if (isMobileMQ.matches) {
-      const r = bar.getBoundingClientRect();
-      dropdownPanel.style.top = (r.bottom + 6) + "px";
-    } else {
-      dropdownPanel.style.top = "";  // let CSS rule (top: calc(100% + 8px)) take over
+  // ---------------------------------------------------------------- dropdown UX (multi-panel)
+  // Generic registry so any number of dropdown buttons can share the open/close logic.
+  const DD = (() => {
+    const all = [];
+    let openEntry = null;
+
+    function positionForMobile(panel) {
+      if (isMobileMQ.matches) {
+        const r = bar.getBoundingClientRect();
+        panel.style.top = (r.bottom + 6) + "px";
+      } else {
+        panel.style.top = "";  // let CSS rule (top: calc(100% + 8px)) take over
+      }
     }
-  }
-  function openDropdown() {
-    // sync cfg fields with current saved values when opening
+    function open(entry) {
+      if (openEntry === entry) return;
+      if (openEntry) close();
+      openEntry = entry;
+      positionForMobile(entry.panel);
+      if (entry.onOpen) try { entry.onOpen(); } catch (e) { console.error(e); }
+      entry.panel.classList.add("open");
+      entry.btn.setAttribute("aria-expanded", "true");
+      if (isMobileMQ.matches) dropdownBackdrop.classList.add("open");
+    }
+    function close() {
+      if (!openEntry) { dropdownBackdrop.classList.remove("open"); return; }
+      openEntry.panel.classList.remove("open");
+      openEntry.btn.setAttribute("aria-expanded", "false");
+      openEntry = null;
+      dropdownBackdrop.classList.remove("open");
+    }
+    function toggle(entry) {
+      if (openEntry === entry) close();
+      else open(entry);
+    }
+    function register(btn, panel, onOpen) {
+      const entry = { btn, panel, onOpen };
+      all.push(entry);
+      btn.addEventListener("click", e => { e.stopPropagation(); toggle(entry); });
+      return entry;
+    }
+    function isInsideOpen(target) {
+      return openEntry && (openEntry.panel.contains(target) || openEntry.btn.contains(target));
+    }
+    function getOpenPanel() { return openEntry && openEntry.panel; }
+    return { register, open, close, isInsideOpen, getOpenPanel, positionForMobile };
+  })();
+
+  // Register the two dropdowns
+  DD.register(settingsBtn, settingsPanel, () => {
+    // Sync cfg fields with the currently saved values whenever opening
     const saved = loadCfg();
     cfgWsInput.value    = saved.ws || "";
     cfgTokenInput.value = saved.token || "";
     cfgErr.textContent  = "";
-    positionPanelForMobile();
-    dropdownPanel.classList.add("open");
-    dropdownBtn.setAttribute("aria-expanded", "true");
-    if (isMobileMQ.matches) dropdownBackdrop.classList.add("open");
-  }
-  function closeDropdown() {
-    dropdownPanel.classList.remove("open");
-    dropdownBackdrop.classList.remove("open");
-    dropdownBtn.setAttribute("aria-expanded", "false");
-  }
-  function toggleDropdown() {
-    if (dropdownPanel.classList.contains("open")) closeDropdown();
-    else openDropdown();
-  }
-
-  // Re-position when the viewport changes (orientation, keyboard pop, resize)
-  window.addEventListener("resize", () => {
-    if (dropdownPanel.classList.contains("open")) positionPanelForMobile();
   });
-  // Tap on backdrop closes
-  dropdownBackdrop.addEventListener("click", closeDropdown);
+  DD.register(featuresBtn, featuresPanel, () => {
+    featureStatus.textContent = "";
+  });
+
+  // Re-position the open panel when viewport changes (orientation / soft keyboard)
+  window.addEventListener("resize", () => {
+    const p = DD.getOpenPanel();
+    if (p) DD.positionForMobile(p);
+  });
+  // Tap outside / on backdrop closes
+  dropdownBackdrop.addEventListener("click", DD.close);
 
   // When the on-screen keyboard pops up on mobile, scroll the focused input
   // into the visible area inside the scrollable panel
@@ -600,26 +728,21 @@
     });
   });
 
-  dropdownBtn.addEventListener("click", e => {
-    e.stopPropagation();
-    toggleDropdown();
-  });
-  // click outside closes
+  // Click outside any open dropdown closes it
   document.addEventListener("click", e => {
-    if (!dropdownPanel.classList.contains("open")) return;
-    if (dropdownPanel.contains(e.target) || dropdownBtn.contains(e.target)) return;
-    closeDropdown();
+    if (!DD.getOpenPanel()) return;
+    if (DD.isInsideOpen(e.target)) return;
+    DD.close();
   });
-  // Escape closes (but only when canvas isn't typing — input fields handle it locally)
+  // Escape closes (unless canvas has focus — game keys come first there)
   document.addEventListener("keydown", e => {
-    if (e.key === "Escape" && dropdownPanel.classList.contains("open")
-        && document.activeElement !== cv) {
-      closeDropdown();
+    if (e.key === "Escape" && DD.getOpenPanel() && document.activeElement !== cv) {
+      DD.close();
     }
   });
 
   // ---------------------------------------------------------------- toolbar / dropdown actions
-  btnRestart.addEventListener("click", () => { restartStream("button"); closeDropdown(); cv.focus(); });
+  btnRestart.addEventListener("click", () => { restartStream("button"); DD.close(); cv.focus(); });
 
   btnFs.addEventListener("click", () => {
     const el = document.documentElement;
@@ -638,8 +761,40 @@
     if (!cfg.ws) { cfgErr.textContent = "WebSocket URL fehlt."; return; }
     cfgErr.textContent = "";
     saveCfg(cfg, cfgRemember.checked);
-    closeDropdown();
+    DD.close();
     restartStream("apply settings");
+  });
+
+  // "Ja bitte" — viewer asks the streamer to refocus the game window
+  btnFgYes.addEventListener("click", () => {
+    if (!ws || ws.readyState !== 1) {
+      fgMsg.style.color = "#e88";
+      fgMsg.textContent = "Nicht verbunden.";
+      return;
+    }
+    send({ type: "focus_game" });
+    fgMsg.style.color = "#9aa3b8";
+    fgMsg.textContent = "Hole Cryptin nach vorn …";
+    btnFgYes.disabled = true;
+    setTimeout(() => { btnFgYes.disabled = false; }, 2500);
+  });
+
+  // Game Feature buttons (Bulls / Bears teleport, etc.)
+  document.querySelectorAll(".feature-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const feature = btn.dataset.feature;
+      const target  = btn.dataset.target;
+      if (!ws || ws.readyState !== 1) {
+        featureStatus.textContent = "Nicht verbunden — Stream zuerst starten.";
+        return;
+      }
+      send({ type: "feature", feature, target });
+      featureStatus.style.color = "#9aa3b8";
+      featureStatus.textContent = `▶ Sende: ${feature} → ${target} …`;
+      // Disable briefly so the user can't double-click flood
+      btn.disabled = true;
+      setTimeout(() => { btn.disabled = false; }, 1500);
+    });
   });
 
   // First-time setup overlay

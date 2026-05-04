@@ -91,6 +91,13 @@
   }
   canvas:focus{outline:1px solid #2c3548;}
 
+  /* quality select — small, dark, matches the rest of the toolbar */
+  #quality-select{
+    padding:5px 8px;font-size:12px;cursor:pointer;
+    background:#1a2030;color:#ddd;border:1px solid #2c3548;border-radius:4px;
+  }
+  #quality-select:hover{background:#222a3c;}
+
   /* compact +/- zoom buttons */
   .zoom-btn{
     min-width:32px;padding:5px 10px;font-size:16px;font-weight:600;
@@ -237,6 +244,12 @@
     <span class="dot"></span>
     <span id="msg">setup…</span>
     <span id="fps"></span>
+    <select id="quality-select" class="btn" title="Streaming-Qualität">
+      <option value="low">Low</option>
+      <option value="mid">Mid</option>
+      <option value="high">High</option>
+      <option value="ultra">Ultra</option>
+    </select>
     <span id="stale-indicator"></span>
     <span class="spacer"></span>
     <span class="hint">Click canvas → keyboard</span>
@@ -426,6 +439,9 @@
   const btnZoomIn  = $("btn-zoom-in"),
         btnZoomOut = $("btn-zoom-out");
 
+  // Streaming quality tier select
+  const qualitySelect = $("quality-select");
+
   const isMobileMQ = window.matchMedia("(max-width: 640px)");
 
   // Stats fields
@@ -508,7 +524,12 @@
     }
     ws.binaryType = "arraybuffer";
 
-    ws.onopen   = () => setStatus("Connected - Cryptin LIVE", "ok");
+    ws.onopen   = () => {
+      setStatus("Connected - Cryptin LIVE", "ok");
+      // Sync the persisted quality tier with the server. Done via a tiny
+      // delay so the WS is ready to send.
+      setTimeout(() => pushQualityToServer(), 60);
+    };
     ws.onclose  = (ev) => {
       setStatus(ev.code === 1006 ? "disconnected (network/auth?)" :
                 `disconnected (${ev.code})`, "warn");
@@ -536,6 +557,11 @@
           } else if (m.type === "foreground") {
             curFg = !!m.active;
             syncOverlays();
+          } else if (m.type === "quality") {
+            // server confirms (or announces) current tier; sync the dropdown
+            if (m.tier && qualitySelect.value !== m.tier) {
+              qualitySelect.value = m.tier;
+            }
           } else if (m.type === "focus_result") {
             if (m.ok) {
               fgMsg.style.color = "#7cd0a8";
@@ -856,6 +882,27 @@
     if (zoomIdx > 0) { zoomIdx--; applyZoom(); }
   });
   applyZoom();
+
+  // ---------------------------------------------------------------- streaming quality tier
+  const QUALITY_LS_KEY = "cryptin_quality_v1";
+  function loadQualityTier() {
+    try {
+      const v = localStorage.getItem(QUALITY_LS_KEY);
+      if (v && ["low","mid","high","ultra"].includes(v)) return v;
+    } catch {}
+    return "mid";
+  }
+  qualitySelect.value = loadQualityTier();
+  qualitySelect.addEventListener("change", () => {
+    const tier = qualitySelect.value;
+    try { localStorage.setItem(QUALITY_LS_KEY, tier); } catch {}
+    send({ type: "set_quality", tier });
+  });
+  // Push the persisted choice to the server right after connecting
+  function pushQualityToServer() {
+    const tier = qualitySelect.value;
+    if (tier && tier !== "mid") send({ type: "set_quality", tier });
+  }
 
   btnApplyCfg.addEventListener("click", () => {
     const cfg = { ws: cfgWsInput.value.trim(), token: cfgTokenInput.value.trim() };

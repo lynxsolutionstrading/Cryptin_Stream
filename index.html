@@ -23,9 +23,29 @@
   #bar button:hover{background:#222a3c;}
   #bar .spacer{flex:1;}
 
-  #stage{flex:1;display:flex;justify-content:center;align-items:center;overflow:hidden;background:#000;}
+  #stage{flex:1;display:flex;justify-content:center;align-items:center;overflow:hidden;background:#000;position:relative;}
   canvas{background:#000;max-width:100%;max-height:100%;cursor:crosshair;outline:none;image-rendering:pixelated;}
   canvas:focus{outline:1px solid #2c3548;}
+
+  /* Game-offline overlay */
+  #offline{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(0,0,0,0.85);z-index:5;pointer-events:none;
+    transition:opacity .25s ease;
+  }
+  #offline.hidden{opacity:0;pointer-events:none;}
+  #offline .panel{
+    background:#10131c;border:1px solid #232a3a;border-radius:8px;padding:22px 30px;
+    text-align:center;min-width:280px;
+  }
+  #offline h2{margin:0 0 8px;font-size:16px;color:#f0f3fa;font-weight:600;}
+  #offline p{margin:0;font-size:13px;color:#9aa3b8;line-height:1.5;}
+  #offline .spinner{
+    width:14px;height:14px;border:2px solid #2c3548;border-top-color:#5a7ed0;
+    border-radius:50%;animation:spin 1s linear infinite;display:inline-block;
+    vertical-align:-2px;margin-right:8px;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
 
   /* Setup overlay (when no ws/token in URL) */
   #setup{
@@ -69,6 +89,12 @@
   </div>
   <div id="stage">
     <canvas id="cv" width="800" height="600" tabindex="0"></canvas>
+    <div id="offline" class="hidden">
+      <div class="panel">
+        <h2><span class="spinner"></span>Warte auf metin2client.exe …</h2>
+        <p>Streamer prüft alle 5 Sekunden. Sobald das Spiel läuft, geht es automatisch weiter.</p>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -100,6 +126,7 @@
         rememberInput = $("remember"), errEl = $("setup-err");
   const btnConnect = $("btn-connect"), btnFs = $("btn-fs"),
         btnReconfig = $("btn-reconfig"), btnMute = $("btn-mute-input");
+  const offline = $("offline");
 
   const LS_KEY = "cryptin_stream_cfg_v1";
   let ws = null, viewOnly = false;
@@ -145,6 +172,7 @@
 
     setStatus("connecting…", "warn");
     setup.classList.add("hidden");
+    offline.classList.add("hidden");
 
     try { ws = new WebSocket(url); }
     catch (e) { errEl.textContent = "Fehler: " + e.message; setup.classList.remove("hidden"); return; }
@@ -164,7 +192,20 @@
 
     const img = new Image();
     ws.onmessage = (ev) => {
-      if (typeof ev.data === "string") return;
+      if (typeof ev.data === "string") {
+        // text frames carry status updates from the streamer
+        try {
+          const m = JSON.parse(ev.data);
+          if (m.type === "status") {
+            const running = m.game === "running";
+            offline.classList.toggle("hidden", running);
+            setStatus(running ? "connected — game live" : "connected — waiting for metin2client.exe", running ? "ok" : "warn");
+          }
+        } catch {}
+        return;
+      }
+      // binary -> JPEG frame
+      offline.classList.add("hidden");  // any frame implies game is up
       bytesIn += ev.data.byteLength;
       const blob = new Blob([ev.data], { type: "image/jpeg" });
       const url = URL.createObjectURL(blob);

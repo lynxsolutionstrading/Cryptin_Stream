@@ -576,7 +576,12 @@
             }
           } else if (m.type === "feature_result") {
             const tag = `${m.feature} → ${m.target}`;
-            if (m.ok) {
+            if (m.ok && m.feature === "client" && m.target === "start"
+                     && /already_running/.test(m.command || "")) {
+              // Friendly "already open" notice instead of generic success
+              featureStatus.style.color = "#e0b454";
+              featureStatus.textContent = "⚠ Der Client ist bereits offen!";
+            } else if (m.ok) {
               featureStatus.style.color = "#7cd0a8";
               featureStatus.textContent = `✓ ${tag}: ${m.command || "executed"}`;
             } else {

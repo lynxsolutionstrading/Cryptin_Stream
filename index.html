@@ -32,6 +32,8 @@
   button.btn.primary:hover{background:#345aa0;}
   button.btn.toggle-on{background:#5a2020;border-color:#7a3030;color:#ffd0d0;}
   button.btn.toggle-on:hover{background:#6a2828;}
+  button.btn.warn{background:#5a2020;border-color:#7a3030;color:#ffd0d0;}
+  button.btn.warn:hover{background:#6a2828;}
 
   /* ---------- dropdown ---------- */
   .dropdown{position:relative;}
@@ -240,9 +242,33 @@
                   data-feature="teleport" data-target="bears"
                   title="Teleport zu Map1 Blau (c1)">📉 Bears <span style="opacity:.65">— Map1 Blau (c1)</span></button>
         </div>
+
+        <hr>
+
+        <h3>Spiel-UI</h3>
+        <div class="row">
+          <button class="btn feature-btn" type="button"
+                  data-feature="key" data-target="m"
+                  title="Karte öffnen / schließen (M)">🗺 Karte</button>
+          <button class="btn feature-btn" type="button"
+                  data-feature="key" data-target="i"
+                  title="Inventar öffnen / schließen (I)">🎒 Inventar</button>
+          <button class="btn feature-btn" type="button"
+                  data-feature="key" data-target="escape"
+                  title="System-Menü öffnen / schließen (Esc)">⚙ Menü</button>
+        </div>
+
+        <hr>
+
+        <h3>Client</h3>
+        <div class="row">
+          <button class="btn warn feature-btn" type="button"
+                  data-feature="client" data-target="restart"
+                  title="Beendet metin2client.exe und startet ihn neu (restart.bat)">🔄 Client neustarten</button>
+        </div>
+
         <p style="font-size:11px;color:#6f7a93;margin:10px 0 0;line-height:1.5;">
-          Sendet einen GM-Warp-Befehl über die Chat-Eingabe. Ergebnis erscheint
-          unten als kurze Bestätigung.
+          Befehle gehen direkt ans Spielfenster — keine Eingabe im Chat nötig.
         </p>
         <div id="feature-status" class="err" style="color:#9aa3b8;"></div>
       </div>

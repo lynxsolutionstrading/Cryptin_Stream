@@ -85,8 +85,18 @@
     object-fit:contain;
     cursor:crosshair;outline:none;
     image-rendering:auto;        /* smooth upscaling instead of blocky pixels */
+    transform:scale(var(--zoom, 1));
+    transform-origin:center center;
+    transition:transform .15s ease;
   }
   canvas:focus{outline:1px solid #2c3548;}
+
+  /* compact +/- zoom buttons */
+  .zoom-btn{
+    min-width:32px;padding:5px 10px;font-size:16px;font-weight:600;
+    line-height:1;
+  }
+  .zoom-btn:disabled{opacity:.35;cursor:not-allowed;}
 
   /* ---------- game-offline overlay ---------- */
   #offline{
@@ -230,6 +240,12 @@
     <span id="stale-indicator"></span>
     <span class="spacer"></span>
     <span class="hint">Click canvas → keyboard</span>
+
+    <!-- Zoom controls — discrete steps, capped at min/max -->
+    <button id="btn-zoom-out" class="btn zoom-btn" type="button"
+            aria-label="Verkleinern" title="Bild kleiner">−</button>
+    <button id="btn-zoom-in" class="btn zoom-btn" type="button"
+            aria-label="Vergrößern" title="Bild größer">+</button>
 
     <!-- Game Features dropdown — interactive in-game commands -->
     <div class="dropdown">
@@ -405,6 +421,10 @@
   const fgPopup = $("fg-popup"),
         fgMsg   = $("fg-msg"),
         btnFgYes = $("btn-fg-yes");
+
+  // Zoom controls
+  const btnZoomIn  = $("btn-zoom-in"),
+        btnZoomOut = $("btn-zoom-out");
 
   const isMobileMQ = window.matchMedia("(max-width: 640px)");
 
@@ -808,6 +828,34 @@
     btnMute.textContent = "👁 View-only: " + (viewOnly ? "ON" : "OFF");
     btnMute.classList.toggle("toggle-on", viewOnly);
   });
+
+  // ---------------------------------------------------------------- zoom
+  // Discrete zoom steps so users can't keep clicking forever and end up at
+  // 0.001x or 50x. Default = 1.0 (object-fit: contain fits stage exactly).
+  const ZOOM_STEPS = [0.5, 0.65, 0.8, 1.0, 1.25, 1.5, 1.75, 2.0];
+  const ZOOM_DEFAULT = 3;        // index of 1.0
+  const ZOOM_LS_KEY  = "cryptin_zoom_v1";
+  let zoomIdx = (() => {
+    try {
+      const v = parseInt(localStorage.getItem(ZOOM_LS_KEY) || "", 10);
+      if (!isNaN(v) && v >= 0 && v < ZOOM_STEPS.length) return v;
+    } catch {}
+    return ZOOM_DEFAULT;
+  })();
+  function applyZoom() {
+    const z = ZOOM_STEPS[zoomIdx];
+    document.documentElement.style.setProperty("--zoom", String(z));
+    btnZoomIn.disabled  = (zoomIdx >= ZOOM_STEPS.length - 1);
+    btnZoomOut.disabled = (zoomIdx <= 0);
+    try { localStorage.setItem(ZOOM_LS_KEY, String(zoomIdx)); } catch {}
+  }
+  btnZoomIn.addEventListener("click", () => {
+    if (zoomIdx < ZOOM_STEPS.length - 1) { zoomIdx++; applyZoom(); }
+  });
+  btnZoomOut.addEventListener("click", () => {
+    if (zoomIdx > 0) { zoomIdx--; applyZoom(); }
+  });
+  applyZoom();
 
   btnApplyCfg.addEventListener("click", () => {
     const cfg = { ws: cfgWsInput.value.trim(), token: cfgTokenInput.value.trim() };

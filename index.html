@@ -34,6 +34,9 @@
   button.btn.toggle-on:hover{background:#6a2828;}
   button.btn.warn{background:#5a2020;border-color:#7a3030;color:#ffd0d0;}
   button.btn.warn:hover{background:#6a2828;}
+  button.btn:disabled, button.btn:disabled:hover{
+    opacity:.35;cursor:not-allowed;background:#1a2030;color:#ddd;border-color:#2c3548;
+  }
 
   /* ---------- dropdown ---------- */
   .dropdown{position:relative;}
@@ -474,6 +477,20 @@
     // Foreground popup only when game is up but its window isn't focused.
     fgPopup.classList.toggle("hidden", !(gameRunning && !curFg));
     if (gameRunning && curFg) fgMsg.textContent = "";
+
+    // Strict button-state per client status:
+    //   client running     -> disable "Client starten"
+    //   client NOT running -> disable Bulls / Bears / Karte / Inventar / Menü /
+    //                         Client schliessen / Client neustarten
+    document.querySelectorAll(".feature-btn").forEach(btn => {
+      const f = btn.dataset.feature;
+      const t = btn.dataset.target;
+      if (f === "client" && t === "start") {
+        btn.disabled = gameRunning;
+      } else {
+        btn.disabled = !gameRunning;
+      }
+    });
   }
 
   // ---------------------------------------------------------------- config
@@ -584,10 +601,11 @@
               // Friendly "already open" notice instead of generic success
               featureStatus.style.color = "#e0b454";
               featureStatus.textContent = "⚠ Der Client ist bereits offen!";
-            } else if (m.ok && m.feature === "client" && m.target === "close"
+            } else if (m.ok && m.feature === "client"
+                     && (m.target === "close" || m.target === "restart")
                      && /not_running/.test(m.command || "")) {
               featureStatus.style.color = "#e0b454";
-              featureStatus.textContent = "⚠ Der Client läuft nicht.";
+              featureStatus.textContent = "⚠ Es läuft aktuell kein Client.";
             } else if (m.ok) {
               featureStatus.style.color = "#7cd0a8";
               featureStatus.textContent = `✓ ${tag}: ${m.command || "executed"}`;
@@ -897,6 +915,8 @@
     if (zoomIdx > 0) { zoomIdx--; applyZoom(); }
   });
   applyZoom();
+  // Apply initial disabled state to feature buttons until status arrives.
+  syncOverlays();
 
   // ---------------------------------------------------------------- streaming quality tier
   const QUALITY_LS_KEY = "cryptin_quality_v1";

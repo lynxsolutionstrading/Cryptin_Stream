@@ -9,29 +9,76 @@
   html,body{margin:0;padding:0;background:#000;color:#ddd;font-family:'Segoe UI',Tahoma,sans-serif;height:100%;overflow:hidden;}
   #wrap{display:flex;flex-direction:column;height:100%;}
 
+  /* ---------- top bar ---------- */
   #bar{
     padding:8px 12px;background:#0d0f14;border-bottom:1px solid #1d2230;
     font-size:12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;
+    position:relative;z-index:30;
   }
   #bar .dot{width:10px;height:10px;border-radius:50%;background:#600;flex-shrink:0;}
   #bar.ok .dot{background:#0c6;}
   #bar.warn .dot{background:#c80;}
-  #bar button{
-    background:#1a2030;color:#ddd;border:1px solid #2c3548;padding:5px 10px;
-    border-radius:4px;cursor:pointer;font-size:12px;
-  }
-  #bar button:hover{background:#222a3c;}
-  #bar button.primary{background:#2a4a8a;border-color:#3a5a9a;color:#fff;}
-  #bar button.primary:hover{background:#345aa0;}
-  #bar button.warn{background:#5a2020;border-color:#7a3030;color:#ffd0d0;}
   #bar .spacer{flex:1;}
   #bar .stale{color:#e88;}
+  #bar .hint{opacity:.6;}
 
+  button.btn{
+    background:#1a2030;color:#ddd;border:1px solid #2c3548;padding:6px 12px;
+    border-radius:4px;cursor:pointer;font-size:12px;font-family:inherit;
+    line-height:1.2;
+  }
+  button.btn:hover{background:#222a3c;}
+  button.btn.primary{background:#2a4a8a;border-color:#3a5a9a;color:#fff;}
+  button.btn.primary:hover{background:#345aa0;}
+  button.btn.toggle-on{background:#5a2020;border-color:#7a3030;color:#ffd0d0;}
+  button.btn.toggle-on:hover{background:#6a2828;}
+
+  /* ---------- dropdown ---------- */
+  .dropdown{position:relative;}
+  .dropdown-panel{
+    position:absolute;top:calc(100% + 8px);right:0;
+    background:#10131c;border:1px solid #232a3a;border-radius:6px;
+    box-shadow:0 12px 36px rgba(0,0,0,0.65);
+    padding:14px 16px;width:min(400px,92vw);z-index:25;
+    display:none;
+  }
+  .dropdown-panel.open{display:block;}
+  .dropdown-panel h3{
+    margin:0 0 8px;font-size:11px;letter-spacing:0.6px;
+    text-transform:uppercase;color:#6f7a93;font-weight:600;
+  }
+  .dropdown-panel hr{border:none;border-top:1px solid #1d2230;margin:14px 0;}
+  .dropdown-panel .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
+  .dropdown-panel label{
+    display:block;font-size:11px;color:#9aa3b8;
+    margin:8px 0 4px;text-transform:uppercase;letter-spacing:0.5px;
+  }
+  .dropdown-panel input[type=text],
+  .dropdown-panel input[type=password]{
+    width:100%;box-sizing:border-box;padding:6px 8px;
+    background:#0a0d14;color:#ddd;border:1px solid #2c3548;
+    border-radius:4px;font-size:12px;font-family:inherit;
+  }
+  .dropdown-panel input:focus{outline:none;border-color:#3a4a6e;}
+  .dropdown-panel .remember{
+    font-size:12px;color:#9aa3b8;display:flex;align-items:center;gap:6px;
+    margin-left:auto;
+  }
+  .dropdown-panel .err{color:#e08;font-size:11px;margin-top:6px;min-height:14px;}
+
+  /* stats grid */
+  .stats{
+    font-size:12px;line-height:1.85;color:#ddd;
+    font-family:ui-monospace,Consolas,Menlo,monospace;
+  }
+  .stats .k{color:#6f7a93;display:inline-block;min-width:118px;}
+
+  /* ---------- stage ---------- */
   #stage{flex:1;display:flex;justify-content:center;align-items:center;overflow:hidden;background:#000;position:relative;}
   canvas{background:#000;max-width:100%;max-height:100%;cursor:crosshair;outline:none;image-rendering:pixelated;}
   canvas:focus{outline:1px solid #2c3548;}
 
-  /* Game-offline overlay */
+  /* ---------- game-offline overlay ---------- */
   #offline{
     position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     background:rgba(0,0,0,0.85);z-index:5;pointer-events:none;
@@ -39,8 +86,8 @@
   }
   #offline.hidden{opacity:0;pointer-events:none;}
   #offline .panel{
-    background:#10131c;border:1px solid #232a3a;border-radius:8px;padding:22px 30px;
-    text-align:center;min-width:280px;
+    background:#10131c;border:1px solid #232a3a;border-radius:8px;
+    padding:22px 30px;text-align:center;min-width:280px;
   }
   #offline h2{margin:0 0 8px;font-size:16px;color:#f0f3fa;font-weight:600;}
   #offline p{margin:0;font-size:13px;color:#9aa3b8;line-height:1.5;}
@@ -51,15 +98,16 @@
   }
   @keyframes spin{to{transform:rotate(360deg);}}
 
-  /* Setup overlay (when no ws/token in URL) */
+  /* ---------- first-time setup overlay ---------- */
   #setup{
     position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    background:rgba(0,0,0,0.92);z-index:10;
+    background:rgba(0,0,0,0.92);z-index:40;
   }
   #setup.hidden{display:none;}
   #setup .card{
-    background:#10131c;border:1px solid #232a3a;border-radius:8px;padding:24px 28px;
-    width:min(460px,90vw);box-shadow:0 12px 40px rgba(0,0,0,0.6);
+    background:#10131c;border:1px solid #232a3a;border-radius:8px;
+    padding:24px 28px;width:min(460px,90vw);
+    box-shadow:0 12px 40px rgba(0,0,0,0.6);
   }
   #setup h1{margin:0 0 6px;font-size:18px;font-weight:600;color:#f0f3fa;}
   #setup p{margin:0 0 16px;font-size:13px;line-height:1.55;color:#9aa3b8;}
@@ -70,11 +118,6 @@
   }
   #setup input:focus{outline:none;border-color:#3a4a6e;}
   #setup .actions{display:flex;gap:10px;align-items:center;margin-top:18px;}
-  #setup button.primary{
-    background:#2a4a8a;color:#fff;border:1px solid #3a5a9a;padding:8px 18px;
-    border-radius:4px;cursor:pointer;font-size:13px;font-weight:500;
-  }
-  #setup button.primary:hover{background:#345aa0;}
   #setup .remember{font-size:12px;color:#9aa3b8;display:flex;align-items:center;gap:6px;}
   #setup .err{color:#e08;font-size:12px;margin-top:8px;min-height:16px;}
 </style>
@@ -87,12 +130,46 @@
     <span id="fps"></span>
     <span id="stale-indicator"></span>
     <span class="spacer"></span>
-    <span style="opacity:.6">Click canvas → keyboard. </span>
-    <button id="btn-restart" class="primary" type="button" title="Verbindung komplett neu aufbauen (Strg+R im Canvas funktioniert auch)">Restart Stream</button>
-    <button id="btn-fs" type="button">Fullscreen</button>
-    <button id="btn-reconfig" type="button">Settings</button>
-    <button id="btn-mute-input" type="button" title="Block all mouse/keyboard forwarding">View-only: OFF</button>
+    <span class="hint">Click canvas → keyboard</span>
+    <div class="dropdown">
+      <button id="btn-settings-toggle" class="btn primary" type="button" aria-expanded="false" aria-controls="settings-panel">
+        ⚙ Stream Settings <span style="opacity:.7">▾</span>
+      </button>
+      <div id="settings-panel" class="dropdown-panel" role="menu">
+
+        <h3>Stream Control</h3>
+        <div class="row">
+          <button id="btn-restart" class="btn primary" type="button" title="Strg+R im Canvas funktioniert auch">⟳ Restart Stream</button>
+          <button id="btn-fs" class="btn" type="button">⛶ Fullscreen</button>
+          <button id="btn-mute-input" class="btn" type="button" title="Maus + Tastatur Forwarding deaktivieren">👁 View-only: OFF</button>
+        </div>
+
+        <hr>
+
+        <h3>Connection</h3>
+        <label for="cfg-ws">WebSocket URL</label>
+        <input id="cfg-ws" type="text" placeholder="wss://your-tunnel.trycloudflare.com/ws" autocomplete="off" spellcheck="false">
+        <label for="cfg-token">Token</label>
+        <input id="cfg-token" type="password" placeholder="CRYPTIN_STREAM_TOKEN" autocomplete="off" spellcheck="false">
+        <div class="row" style="margin-top:12px;">
+          <button id="btn-apply-cfg" class="btn primary" type="button">Apply &amp; Reconnect</button>
+          <label class="remember"><input id="cfg-remember" type="checkbox" checked> im Browser merken</label>
+        </div>
+        <div id="cfg-err" class="err"></div>
+
+        <hr>
+
+        <h3>Stats</h3>
+        <div class="stats">
+          <div><span class="k">Status</span><span id="stat-status">—</span></div>
+          <div><span class="k">Resolution</span><span id="stat-res">—</span></div>
+          <div><span class="k">Performance</span><span id="stat-perf">—</span></div>
+          <div><span class="k">Last frame</span><span id="stat-age">—</span></div>
+        </div>
+      </div>
+    </div>
   </div>
+
   <div id="stage">
     <canvas id="cv" width="800" height="600" tabindex="0"></canvas>
     <div id="offline" class="hidden">
@@ -104,6 +181,8 @@
   </div>
 </div>
 
+<!-- First-time setup (only shown when no config is saved). All later
+     reconfiguration happens via the Stream Settings dropdown. -->
 <div id="setup">
   <div class="card">
     <h1>Cryptin Stream</h1>
@@ -116,7 +195,7 @@
     <input id="token" type="password" placeholder="dein Auth-Token (CRYPTIN_STREAM_TOKEN)" autocomplete="off" spellcheck="false">
 
     <div class="actions">
-      <button id="btn-connect" class="primary" type="button">Connect</button>
+      <button id="btn-connect" class="btn primary" type="button">Connect</button>
       <label class="remember"><input id="remember" type="checkbox" checked> im Browser merken</label>
     </div>
     <div id="setup-err" class="err"></div>
@@ -128,22 +207,44 @@
   const $ = id => document.getElementById(id);
   const cv = $("cv"), ctx = cv.getContext("2d", { alpha: false });
   const bar = $("bar"), msg = $("msg"), fpsEl = $("fps");
-  const setup = $("setup"), wsInput = $("ws-url"), tokenInput = $("token"),
-        rememberInput = $("remember"), errEl = $("setup-err");
-  const btnConnect = $("btn-connect"), btnFs = $("btn-fs"),
-        btnReconfig = $("btn-reconfig"), btnMute = $("btn-mute-input"),
-        btnRestart = $("btn-restart");
   const offline = $("offline"), staleEl = $("stale-indicator");
+
+  // First-time setup overlay
+  const setup = $("setup"),
+        wsInput = $("ws-url"),
+        tokenInput = $("token"),
+        rememberInput = $("remember"),
+        errEl = $("setup-err"),
+        btnConnect = $("btn-connect");
+
+  // Stream Settings dropdown
+  const dropdownBtn  = $("btn-settings-toggle"),
+        dropdownPanel = $("settings-panel"),
+        cfgWsInput    = $("cfg-ws"),
+        cfgTokenInput = $("cfg-token"),
+        cfgRemember   = $("cfg-remember"),
+        cfgErr        = $("cfg-err"),
+        btnApplyCfg   = $("btn-apply-cfg"),
+        btnRestart    = $("btn-restart"),
+        btnFs         = $("btn-fs"),
+        btnMute       = $("btn-mute-input");
+
+  // Stats fields
+  const statStatus = $("stat-status"),
+        statRes    = $("stat-res"),
+        statPerf   = $("stat-perf"),
+        statAge    = $("stat-age");
 
   const LS_KEY = "cryptin_stream_cfg_v1";
   let ws = null, viewOnly = false;
   let frames = 0, lastFpsTs = performance.now(), bytesIn = 0;
+  let lastFps = 0, lastKbs = 0, lastFrameSize = 0;
   let urlCur = null;
-  let lastFrameTs = 0;          // wall-clock of last received binary frame
-  let staleTimer = null;        // setInterval handle for stale detection
-  let autoRestartArmed = false; // flips true once we've seen >=1 frame, so we know "stuck" is real
+  let lastFrameTs = 0;
+  let autoRestartArmed = false;
+  let curStatusText = "—";
 
-  // ---- config: URL params override localStorage ----
+  // ---------------------------------------------------------------- config
   function loadCfg() {
     const params = new URLSearchParams(location.search);
     let cfg = { ws: "", token: "" };
@@ -152,24 +253,25 @@
     if (params.get("token")) cfg.token = params.get("token");
     return cfg;
   }
-  function saveCfg(cfg) {
-    if (rememberInput.checked) localStorage.setItem(LS_KEY, JSON.stringify(cfg));
-    else                       localStorage.removeItem(LS_KEY);
+  function saveCfg(cfg, remember) {
+    if (remember) localStorage.setItem(LS_KEY, JSON.stringify(cfg));
+    else          localStorage.removeItem(LS_KEY);
   }
 
+  // ---------------------------------------------------------------- status helpers
   function setStatus(text, state) {
     msg.textContent = text;
+    curStatusText = text;
     bar.classList.remove("ok","warn");
     if (state === "ok")   bar.classList.add("ok");
     if (state === "warn") bar.classList.add("warn");
   }
 
-  // ---- WebSocket connect ----
+  // ---------------------------------------------------------------- WebSocket
   function buildWsUrl(base, token) {
     if (!base) return null;
     let u;
     try { u = new URL(base); } catch { return null; }
-    // accept http(s) and convert to ws(s)
     if (u.protocol === "https:") u.protocol = "wss:";
     else if (u.protocol === "http:") u.protocol = "ws:";
     if (token) u.searchParams.set("token", token);
@@ -178,24 +280,33 @@
 
   function connect(cfg) {
     const url = buildWsUrl(cfg.ws, cfg.token);
-    if (!url) { errEl.textContent = "Ungültige WebSocket URL."; return; }
-
+    if (!url) {
+      const e = "Ungültige WebSocket URL.";
+      errEl.textContent = e; cfgErr.textContent = e;
+      return;
+    }
     setStatus("connecting…", "warn");
     setup.classList.add("hidden");
     offline.classList.add("hidden");
 
     try { ws = new WebSocket(url); }
-    catch (e) { errEl.textContent = "Fehler: " + e.message; setup.classList.remove("hidden"); return; }
+    catch (e) {
+      errEl.textContent = "Fehler: " + e.message;
+      cfgErr.textContent = "Fehler: " + e.message;
+      setup.classList.remove("hidden");
+      return;
+    }
     ws.binaryType = "arraybuffer";
 
-    ws.onopen   = () => setStatus("connected", "ok");
+    ws.onopen   = () => setStatus("Connected - Cryptin LIVE", "ok");
     ws.onclose  = (ev) => {
       setStatus(ev.code === 1006 ? "disconnected (network/auth?)" :
                 `disconnected (${ev.code})`, "warn");
       if (ev.code === 1006) {
-        // most likely: tunnel down OR token rejected (server returns 401 before upgrade)
-        errEl.textContent = "Verbindung abgewiesen. Token korrekt? Tunnel läuft?";
-        setup.classList.remove("hidden");
+        const e = "Verbindung abgewiesen. Token korrekt? Tunnel läuft?";
+        errEl.textContent = e; cfgErr.textContent = e;
+        // If we never got past auth, surface the setup overlay.
+        if (!autoRestartArmed) setup.classList.remove("hidden");
       }
     };
     ws.onerror  = () => setStatus("error", "warn");
@@ -203,21 +314,23 @@
     const img = new Image();
     ws.onmessage = (ev) => {
       if (typeof ev.data === "string") {
-        // text frames carry status updates from the streamer
         try {
           const m = JSON.parse(ev.data);
           if (m.type === "status") {
             const running = m.game === "running";
             offline.classList.toggle("hidden", running);
-            setStatus(running ? "connected — game live" : "connected — waiting for metin2client.exe", running ? "ok" : "warn");
+            setStatus(running ? "Connected - Cryptin LIVE (Control Subscription)"
+                              : "Cryptin LIVE - Waiting for client",
+                      running ? "ok" : "warn");
           }
         } catch {}
         return;
       }
       // binary -> JPEG frame
-      offline.classList.add("hidden");  // any frame implies game is up
+      offline.classList.add("hidden");
       lastFrameTs = performance.now();
       autoRestartArmed = true;
+      lastFrameSize = ev.data.byteLength;
       bytesIn += ev.data.byteLength;
       const blob = new Blob([ev.data], { type: "image/jpeg" });
       const url = URL.createObjectURL(blob);
@@ -230,9 +343,9 @@
         frames++;
         const now = performance.now();
         if (now - lastFpsTs >= 1000) {
-          const fps = frames * 1000 / (now - lastFpsTs);
-          const kbs = bytesIn / 1024 / ((now - lastFpsTs) / 1000);
-          fpsEl.textContent = `${fps.toFixed(1)} fps · ${kbs.toFixed(0)} KB/s`;
+          lastFps = frames * 1000 / (now - lastFpsTs);
+          lastKbs = bytesIn / 1024 / ((now - lastFpsTs) / 1000);
+          fpsEl.textContent = `${lastFps.toFixed(1)} fps · ${lastKbs.toFixed(0)} KB/s`;
           frames = 0; bytesIn = 0; lastFpsTs = now;
         }
         if (old) URL.revokeObjectURL(old);
@@ -243,10 +356,9 @@
 
   function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
 
-  // Hard reset: tear down WS, clear state, reconnect with current saved cfg.
+  // ---------------------------------------------------------------- restart
   function restartStream(reason) {
     if (reason) console.info("[restart]", reason);
-    // tear down current socket; remove handlers so close-handler doesn't auto-reconnect
     try {
       if (ws) {
         ws.onopen = ws.onclose = ws.onerror = ws.onmessage = null;
@@ -254,13 +366,12 @@
       }
     } catch {}
     ws = null;
-    // reset stats
     frames = 0; bytesIn = 0; lastFpsTs = performance.now();
     lastFrameTs = 0; autoRestartArmed = false;
+    lastFps = 0; lastKbs = 0; lastFrameSize = 0;
     fpsEl.textContent = "";
     staleEl.textContent = "";
     staleEl.classList.remove("stale");
-    // visual: clear canvas to indicate fresh start
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, cv.width, cv.height);
     setStatus("restarting…", "warn");
@@ -274,26 +385,37 @@
     cv.focus();
   }
 
-  // Stale-frame indicator — runs once a second.
-  // Shows "stale 2.3s" in red when no frame has arrived for >2s, while the
-  // status bar still says "connected". Helps you notice a frozen stream.
+  // ---------------------------------------------------------------- stale + stats tick
   setInterval(() => {
+    // bar stale indicator
     if (!ws || ws.readyState !== 1 || !autoRestartArmed) {
       staleEl.textContent = "";
       staleEl.classList.remove("stale");
-      return;
-    }
-    const age = (performance.now() - lastFrameTs) / 1000;
-    if (age > 2) {
-      staleEl.textContent = `· stale ${age.toFixed(1)}s`;
-      staleEl.classList.add("stale");
     } else {
-      staleEl.textContent = "";
-      staleEl.classList.remove("stale");
+      const age = (performance.now() - lastFrameTs) / 1000;
+      if (age > 2) {
+        staleEl.textContent = `· stale ${age.toFixed(1)}s`;
+        staleEl.classList.add("stale");
+      } else {
+        staleEl.textContent = "";
+        staleEl.classList.remove("stale");
+      }
+    }
+
+    // settings panel stats — only update when panel is visible (cheap but pointless to recompute hidden)
+    if (dropdownPanel.classList.contains("open")) {
+      statStatus.textContent = curStatusText;
+      statRes.textContent = (cv.width && cv.height) ? `${cv.width} × ${cv.height}` : "—";
+      statPerf.textContent = lastFps
+        ? `${lastFps.toFixed(1)} fps · ${lastKbs.toFixed(0)} KB/s · ${(lastFrameSize/1024).toFixed(0)} KB/frame`
+        : "—";
+      statAge.textContent = lastFrameTs
+        ? `${((performance.now() - lastFrameTs) / 1000).toFixed(1)} s ago`
+        : "—";
     }
   }, 500);
 
-  // ---- input forwarding ----
+  // ---------------------------------------------------------------- input forwarding
   function pos(ev) {
     const r = cv.getBoundingClientRect();
     return {
@@ -333,7 +455,6 @@
   });
 
   cv.addEventListener("keydown", e => {
-    // Local hotkey: Ctrl+R restarts the stream WITHOUT reloading the page.
     if (e.ctrlKey && (e.key === "r" || e.key === "R")) {
       e.preventDefault();
       restartStream("hotkey Ctrl+R");
@@ -349,18 +470,45 @@
     if (e.key !== "F5" && e.key !== "F12") e.preventDefault();
   });
 
-  // ---- toolbar buttons ----
-  btnConnect.addEventListener("click", () => {
-    const cfg = { ws: wsInput.value.trim(), token: tokenInput.value.trim() };
-    if (!cfg.ws) { errEl.textContent = "WebSocket URL fehlt."; return; }
-    saveCfg(cfg);
-    errEl.textContent = "";
-    if (ws) try { ws.close(); } catch {}
-    connect(cfg);
-    cv.focus();
+  // ---------------------------------------------------------------- dropdown UX
+  function openDropdown() {
+    // sync cfg fields with current saved values when opening
+    const saved = loadCfg();
+    cfgWsInput.value    = saved.ws || "";
+    cfgTokenInput.value = saved.token || "";
+    cfgErr.textContent  = "";
+    dropdownPanel.classList.add("open");
+    dropdownBtn.setAttribute("aria-expanded", "true");
+  }
+  function closeDropdown() {
+    dropdownPanel.classList.remove("open");
+    dropdownBtn.setAttribute("aria-expanded", "false");
+  }
+  function toggleDropdown() {
+    if (dropdownPanel.classList.contains("open")) closeDropdown();
+    else openDropdown();
+  }
+
+  dropdownBtn.addEventListener("click", e => {
+    e.stopPropagation();
+    toggleDropdown();
+  });
+  // click outside closes
+  document.addEventListener("click", e => {
+    if (!dropdownPanel.classList.contains("open")) return;
+    if (dropdownPanel.contains(e.target) || dropdownBtn.contains(e.target)) return;
+    closeDropdown();
+  });
+  // Escape closes (but only when canvas isn't typing — input fields handle it locally)
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && dropdownPanel.classList.contains("open")
+        && document.activeElement !== cv) {
+      closeDropdown();
+    }
   });
 
-  btnRestart.addEventListener("click", () => restartStream("button"));
+  // ---------------------------------------------------------------- toolbar / dropdown actions
+  btnRestart.addEventListener("click", () => { restartStream("button"); closeDropdown(); cv.focus(); });
 
   btnFs.addEventListener("click", () => {
     const el = document.documentElement;
@@ -368,25 +516,39 @@
     else document.exitFullscreen?.();
   });
 
-  btnReconfig.addEventListener("click", () => {
-    setup.classList.remove("hidden");
-    wsInput.focus();
-  });
-
   btnMute.addEventListener("click", () => {
     viewOnly = !viewOnly;
-    btnMute.textContent = "View-only: " + (viewOnly ? "ON" : "OFF");
-    btnMute.style.background = viewOnly ? "#502020" : "";
+    btnMute.textContent = "👁 View-only: " + (viewOnly ? "ON" : "OFF");
+    btnMute.classList.toggle("toggle-on", viewOnly);
   });
 
-  // ---- boot ----
+  btnApplyCfg.addEventListener("click", () => {
+    const cfg = { ws: cfgWsInput.value.trim(), token: cfgTokenInput.value.trim() };
+    if (!cfg.ws) { cfgErr.textContent = "WebSocket URL fehlt."; return; }
+    cfgErr.textContent = "";
+    saveCfg(cfg, cfgRemember.checked);
+    closeDropdown();
+    restartStream("apply settings");
+  });
+
+  // First-time setup overlay
+  btnConnect.addEventListener("click", () => {
+    const cfg = { ws: wsInput.value.trim(), token: tokenInput.value.trim() };
+    if (!cfg.ws) { errEl.textContent = "WebSocket URL fehlt."; return; }
+    saveCfg(cfg, rememberInput.checked);
+    errEl.textContent = "";
+    if (ws) try { ws.close(); } catch {}
+    connect(cfg);
+    cv.focus();
+  });
+
+  // ---------------------------------------------------------------- boot
   const cfg = loadCfg();
-  wsInput.value = cfg.ws || "";
+  wsInput.value    = cfg.ws    || "";
   tokenInput.value = cfg.token || "";
 
   if (cfg.ws && cfg.token) {
-    // auto-connect when both come from URL or saved
-    saveCfg(cfg);
+    saveCfg(cfg, rememberInput.checked);
     connect(cfg);
     cv.focus();
   } else {

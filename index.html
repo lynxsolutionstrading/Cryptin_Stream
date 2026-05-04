@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cryptin Stream</title>
+<style>
+  :root { color-scheme: dark; }
+  html,body{margin:0;padding:0;background:#000;color:#ddd;font-family:'Segoe UI',Tahoma,sans-serif;height:100%;overflow:hidden;}
+  #wrap{display:flex;flex-direction:column;height:100%;}
+
+  #bar{
+    padding:8px 12px;background:#0d0f14;border-bottom:1px solid #1d2230;
+    font-size:12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;
+  }
+  #bar .dot{width:10px;height:10px;border-radius:50%;background:#600;flex-shrink:0;}
+  #bar.ok .dot{background:#0c6;}
+  #bar.warn .dot{background:#c80;}
+  #bar button{
+    background:#1a2030;color:#ddd;border:1px solid #2c3548;padding:5px 10px;
+    border-radius:4px;cursor:pointer;font-size:12px;
+  }
+  #bar button:hover{background:#222a3c;}
+  #bar .spacer{flex:1;}
+
+  #stage{flex:1;display:flex;justify-content:center;align-items:center;overflow:hidden;background:#000;}
+  canvas{background:#000;max-width:100%;max-height:100%;cursor:crosshair;outline:none;image-rendering:pixelated;}
+  canvas:focus{outline:1px solid #2c3548;}
+
+  /* Setup overlay (when no ws/token in URL) */
+  #setup{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(0,0,0,0.92);z-index:10;
+  }
+  #setup.hidden{display:none;}
+  #setup .card{
+    background:#10131c;border:1px solid #232a3a;border-radius:8px;padding:24px 28px;
+    width:min(460px,90vw);box-shadow:0 12px 40px rgba(0,0,0,0.6);
+  }
+  #setup h1{margin:0 0 6px;font-size:18px;font-weight:600;color:#f0f3fa;}
+  #setup p{margin:0 0 16px;font-size:13px;line-height:1.55;color:#9aa3b8;}
+  #setup label{display:block;font-size:11px;color:#9aa3b8;margin:10px 0 4px;text-transform:uppercase;letter-spacing:0.5px;}
+  #setup input{
+    width:100%;box-sizing:border-box;padding:8px 10px;background:#0a0d14;color:#ddd;
+    border:1px solid #2c3548;border-radius:4px;font-size:13px;font-family:inherit;
+  }
+  #setup input:focus{outline:none;border-color:#3a4a6e;}
+  #setup .actions{display:flex;gap:10px;align-items:center;margin-top:18px;}
+  #setup button.primary{
+    background:#2a4a8a;color:#fff;border:1px solid #3a5a9a;padding:8px 18px;
+    border-radius:4px;cursor:pointer;font-size:13px;font-weight:500;
+  }
+  #setup button.primary:hover{background:#345aa0;}
+  #setup .remember{font-size:12px;color:#9aa3b8;display:flex;align-items:center;gap:6px;}
+  #setup .err{color:#e08;font-size:12px;margin-top:8px;min-height:16px;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="bar">
+    <span class="dot"></span>
+    <span id="msg">setup…</span>
+    <span id="fps"></span>
+    <span class="spacer"></span>
+    <span style="opacity:.6">Click canvas → keyboard. </span>
+    <button id="btn-fs" type="button">Fullscreen</button>
+    <button id="btn-reconfig" type="button">Settings</button>
+    <button id="btn-mute-input" type="button" title="Block all mouse/keyboard forwarding">View-only: OFF</button>
+  </div>
+  <div id="stage">
+    <canvas id="cv" width="800" height="600" tabindex="0"></canvas>
+  </div>
+</div>
+
+<div id="setup">
+  <div class="card">
+    <h1>Cryptin Stream</h1>
+    <p>Verbindung zu deinem lokalen Streamer (über Cloudflare Tunnel oder andere öffentliche WebSocket-URL).</p>
+
+    <label for="ws-url">WebSocket URL</label>
+    <input id="ws-url" type="text" placeholder="wss://your-tunnel.trycloudflare.com/ws" autocomplete="off" spellcheck="false">
+
+    <label for="token">Token</label>
+    <input id="token" type="password" placeholder="dein Auth-Token (CRYPTIN_STREAM_TOKEN)" autocomplete="off" spellcheck="false">
+
+    <div class="actions">
+      <button id="btn-connect" class="primary" type="button">Connect</button>
+      <label class="remember"><input id="remember" type="checkbox" checked> im Browser merken</label>
+    </div>
+    <div id="setup-err" class="err"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const cv = $("cv"), ctx = cv.getContext("2d", { alpha: false });
+  const bar = $("bar"), msg = $("msg"), fpsEl = $("fps");
+  const setup = $("setup"), wsInput = $("ws-url"), tokenInput = $("token"),
+        rememberInput = $("remember"), errEl = $("setup-err");
+  const btnConnect = $("btn-connect"), btnFs = $("btn-fs"),
+        btnReconfig = $("btn-reconfig"), btnMute = $("btn-mute-input");
+
+  const LS_KEY = "cryptin_stream_cfg_v1";
+  let ws = null, viewOnly = false;
+  let frames = 0, lastFpsTs = performance.now(), bytesIn = 0;
+  let urlCur = null;
+
+  // ---- config: URL params override localStorage ----
+  function loadCfg() {
+    const params = new URLSearchParams(location.search);
+    let cfg = { ws: "", token: "" };
+    try { cfg = { ...cfg, ...(JSON.parse(localStorage.getItem(LS_KEY) || "{}")) }; } catch {}
+    if (params.get("ws"))    cfg.ws = params.get("ws");
+    if (params.get("token")) cfg.token = params.get("token");
+    return cfg;
+  }
+  function saveCfg(cfg) {
+    if (rememberInput.checked) localStorage.setItem(LS_KEY, JSON.stringify(cfg));
+    else                       localStorage.removeItem(LS_KEY);
+  }
+
+  function setStatus(text, state) {
+    msg.textContent = text;
+    bar.classList.remove("ok","warn");
+    if (state === "ok")   bar.classList.add("ok");
+    if (state === "warn") bar.classList.add("warn");
+  }
+
+  // ---- WebSocket connect ----
+  function buildWsUrl(base, token) {
+    if (!base) return null;
+    let u;
+    try { u = new URL(base); } catch { return null; }
+    // accept http(s) and convert to ws(s)
+    if (u.protocol === "https:") u.protocol = "wss:";
+    else if (u.protocol === "http:") u.protocol = "ws:";
+    if (token) u.searchParams.set("token", token);
+    return u.toString();
+  }
+
+  function connect(cfg) {
+    const url = buildWsUrl(cfg.ws, cfg.token);
+    if (!url) { errEl.textContent = "Ungültige WebSocket URL."; return; }
+
+    setStatus("connecting…", "warn");
+    setup.classList.add("hidden");
+
+    try { ws = new WebSocket(url); }
+    catch (e) { errEl.textContent = "Fehler: " + e.message; setup.classList.remove("hidden"); return; }
+    ws.binaryType = "arraybuffer";
+
+    ws.onopen   = () => setStatus("connected", "ok");
+    ws.onclose  = (ev) => {
+      setStatus(ev.code === 1006 ? "disconnected (network/auth?)" :
+                `disconnected (${ev.code})`, "warn");
+      if (ev.code === 1006) {
+        // most likely: tunnel down OR token rejected (server returns 401 before upgrade)
+        errEl.textContent = "Verbindung abgewiesen. Token korrekt? Tunnel läuft?";
+        setup.classList.remove("hidden");
+      }
+    };
+    ws.onerror  = () => setStatus("error", "warn");
+
+    const img = new Image();
+    ws.onmessage = (ev) => {
+      if (typeof ev.data === "string") return;
+      bytesIn += ev.data.byteLength;
+      const blob = new Blob([ev.data], { type: "image/jpeg" });
+      const url = URL.createObjectURL(blob);
+      const old = urlCur; urlCur = url;
+      img.onload = () => {
+        if (cv.width !== img.naturalWidth || cv.height !== img.naturalHeight) {
+          cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+        }
+        ctx.drawImage(img, 0, 0);
+        frames++;
+        const now = performance.now();
+        if (now - lastFpsTs >= 1000) {
+          const fps = frames * 1000 / (now - lastFpsTs);
+          const kbs = bytesIn / 1024 / ((now - lastFpsTs) / 1000);
+          fpsEl.textContent = `${fps.toFixed(1)} fps · ${kbs.toFixed(0)} KB/s`;
+          frames = 0; bytesIn = 0; lastFpsTs = now;
+        }
+        if (old) URL.revokeObjectURL(old);
+      };
+      img.src = url;
+    };
+  }
+
+  function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+
+  // ---- input forwarding ----
+  function pos(ev) {
+    const r = cv.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)),
+      y: Math.max(0, Math.min(1, (ev.clientY - r.top)  / r.height)),
+    };
+  }
+  function buttonName(b) { return b === 0 ? "left" : b === 1 ? "middle" : "right"; }
+
+  cv.addEventListener("mousedown", e => {
+    if (viewOnly) return;
+    const p = pos(e); cv.focus();
+    send({type:"mouse", action:"down", button:buttonName(e.button), x:p.x, y:p.y});
+    e.preventDefault();
+  });
+  cv.addEventListener("mouseup", e => {
+    if (viewOnly) return;
+    const p = pos(e);
+    send({type:"mouse", action:"up", button:buttonName(e.button), x:p.x, y:p.y});
+    e.preventDefault();
+  });
+  cv.addEventListener("contextmenu", e => e.preventDefault());
+  cv.addEventListener("wheel", e => {
+    if (viewOnly) return;
+    send({type:"wheel", delta: e.deltaY < 0 ? 120 : -120});
+    e.preventDefault();
+  }, { passive: false });
+
+  let lastMove = 0;
+  cv.addEventListener("mousemove", e => {
+    if (viewOnly) return;
+    const now = performance.now();
+    if (now - lastMove < 30) return;
+    lastMove = now;
+    const p = pos(e);
+    send({type:"mouse", action:"move", button:"left", x:p.x, y:p.y});
+  });
+
+  cv.addEventListener("keydown", e => {
+    if (viewOnly) return;
+    send({type:"key", down:true, key:e.key, code:e.code});
+    if (e.key !== "F5" && e.key !== "F12") e.preventDefault();
+  });
+  cv.addEventListener("keyup", e => {
+    if (viewOnly) return;
+    send({type:"key", down:false, key:e.key, code:e.code});
+    if (e.key !== "F5" && e.key !== "F12") e.preventDefault();
+  });
+
+  // ---- toolbar buttons ----
+  btnConnect.addEventListener("click", () => {
+    const cfg = { ws: wsInput.value.trim(), token: tokenInput.value.trim() };
+    if (!cfg.ws) { errEl.textContent = "WebSocket URL fehlt."; return; }
+    saveCfg(cfg);
+    errEl.textContent = "";
+    if (ws) try { ws.close(); } catch {}
+    connect(cfg);
+    cv.focus();
+  });
+
+  btnFs.addEventListener("click", () => {
+    const el = document.documentElement;
+    if (!document.fullscreenElement) el.requestFullscreen?.();
+    else document.exitFullscreen?.();
+  });
+
+  btnReconfig.addEventListener("click", () => {
+    setup.classList.remove("hidden");
+    wsInput.focus();
+  });
+
+  btnMute.addEventListener("click", () => {
+    viewOnly = !viewOnly;
+    btnMute.textContent = "View-only: " + (viewOnly ? "ON" : "OFF");
+    btnMute.style.background = viewOnly ? "#502020" : "";
+  });
+
+  // ---- boot ----
+  const cfg = loadCfg();
+  wsInput.value = cfg.ws || "";
+  tokenInput.value = cfg.token || "";
+
+  if (cfg.ws && cfg.token) {
+    // auto-connect when both come from URL or saved
+    saveCfg(cfg);
+    connect(cfg);
+    cv.focus();
+  } else {
+    setStatus("setup needed", "warn");
+    wsInput.focus();
+  }
+})();
+</script>
+</body>
+</html>
